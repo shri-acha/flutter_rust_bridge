@@ -50,14 +50,33 @@ fn generate_target(target: Target) -> String {
         vec![generate_dart_fn_deliver_output(target)],
     ]
     .concat();
-    let body = funcs.iter().map(|f| f.generate("")).join("\n");
+    let body = funcs
+        .iter()
+        .map(|f| {
+            let code = f.generate("");
+            match target {
+                Target::Io => code.replace(
+                    "#[unsafe(no_mangle)]",
+                    &format!(
+                        "#[unsafe(export_name = concat!($prefix, \"{}\"))]",
+                        f.partial_func_name
+                    ),
+                ),
+                Target::Web => code,
+            }
+        })
+        .join("\n");
+    let macro_args = match target {
+        Target::Io => r#"() => { $crate::frb_generated_io_extern_func!(""); }; ($prefix:literal)"#,
+        Target::Web => "()",
+    };
 
     format!(
         r#"
             #[doc(hidden)]
             #[macro_export]
             macro_rules! frb_generated_{target_lowercase}_extern_func {{
-                () => {{
+                {macro_args} => {{
                     {body}
                 }};
             }}

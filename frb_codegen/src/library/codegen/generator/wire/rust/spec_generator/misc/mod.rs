@@ -53,6 +53,7 @@ pub(crate) fn generate(
             context.config.default_rust_opaque_codec,
             content_hash,
             &context.config.rust_preamble,
+            &context.config.native_symbol_prefix,
         ),
         wire_funcs: (context.mir_pack.funcs_with_impl().iter())
             .map(|f| generate_wire_func(f, context))
@@ -176,6 +177,7 @@ fn generate_boilerplate(
     default_rust_opaque_codec: RustOpaqueCodecMode,
     content_hash: i32,
     rust_preamble: &str,
+    native_symbol_prefix: &str,
 ) -> Acc<Vec<WireRustOutputCode>> {
     let rust_preamble_formatted = if rust_preamble.is_empty() {
         "".to_owned()
@@ -184,13 +186,18 @@ fn generate_boilerplate(
     };
 
     Acc::new(|target| {
+        let macro_args = if target == TargetOrCommon::Io && !native_symbol_prefix.is_empty() {
+            format!("{native_symbol_prefix:?}")
+        } else {
+            String::new()
+        };
         match target {
             TargetOrCommon::Io | TargetOrCommon::Web => {
                 vec![
                     // generate_boilerplate_frb_initialize_rust(target).into(),
                     // generate_boilerplate_dart_fn_deliver_output(target).into(),
                     format!(
-                        "{rust_preamble_formatted}flutter_rust_bridge::frb_generated_boilerplate_{}!();",
+                        "{rust_preamble_formatted}flutter_rust_bridge::frb_generated_boilerplate_{}!({macro_args});",
                         target.to_string().to_lowercase()
                     )
                     .into(),
